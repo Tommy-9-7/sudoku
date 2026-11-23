@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Sudoku</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #98a2b3;
+      --grid: #d0d5dd;
+      --accent: #7f56d9;
+      --accent-light: #f4f3ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background: #f8fafc;
+    }
+
+    main {
+      width: min(92vw, 520px);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 20px;
+      font-size: clamp(28px, 6vw, 42px);
+      letter-spacing: -0.04em;
+    }
+
+    .board {
+      width: 100%;
+      aspect-ratio: 1;
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      border: 3px solid var(--ink);
+      background: white;
+      box-shadow: 0 16px 40px rgb(16 24 40 / 12%);
+    }
+
+    .cell {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      border-right: 1px solid var(--grid);
+      border-bottom: 1px solid var(--grid);
+      border-radius: 0;
+      outline: none;
+      background: white;
+      color: var(--accent);
+      font: 600 clamp(16px, 5vw, 27px)/1 ui-sans-serif, system-ui, sans-serif;
+      text-align: center;
+      caret-color: transparent;
+    }
+
+    .cell:nth-child(3n) { border-right: 3px solid var(--ink); }
+    .cell:nth-child(9n) { border-right: 0; }
+    .cell:nth-child(n+19):nth-child(-n+27),
+    .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 3px solid var(--ink); }
+    .cell:nth-child(n+73) { border-bottom: 0; }
+    .cell.given { color: var(--ink); background: #f9fafb; }
+    .cell:focus { background: var(--accent-light); box-shadow: inset 0 0 0 2px var(--accent); }
+    .cell.invalid { color: #b42318; background: #fef3f2; }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 18px;
+      background: var(--ink);
+      color: white;
+      font: 700 14px/1 ui-sans-serif, system-ui, sans-serif;
+      cursor: pointer;
+    }
+
+    button.secondary { background: white; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+    button:hover { transform: translateY(-1px); }
+
+    #status {
+      min-height: 24px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      button { transition: transform 150ms ease, background 150ms ease; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Sudoku</h1>
+    <div id="board" class="board" role="grid" aria-label="Sudoku board"></div>
+    <div class="controls">
+      <button id="check" type="button">Check</button>
+      <button id="new-game" class="secondary" type="button">New game</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+
+  <script>
+    const puzzles = [
+      [
+        "530070000",
+        "600195000",
+        "098000060",
+        "800060003",
+        "400803001",
+        "700020006",
+        "060000280",
+        "000419005",
+        "000080079"
+      ],
+      [
+        "200080300",
+        "060070084",
+        "030500209",
+        "000105408",
+        "900000031",
+        "704310000",
+        "301007040",
+        "720040060",
+        "004020005"
+      ]
+    ];
+
+    const solutions = [
+      [
+        "534678912","672195348","198342567","859761423","426853791",
+        "713924856","961537284","287419635","345286179"
+      ],
+      [
+        "245981376","169273584","837564219","976195438","982846731",
+        "754312689","381657942","723498165","694521807"
+      ]
+    ];
+
+    let puzzleIndex = 0;
+
+    function renderPuzzle(index) {
+      const board = document.getElementById("board");
+      board.replaceChildren();
+      document.getElementById("status").textContent = "";
+
+      puzzles[index].forEach((row, rowIndex) => {
+        [...row].forEach((value, columnIndex) => {
+          const input = document.createElement("input");
+          input.className = "cell" + (value !== "0" ? " given" : "");
+          input.type = "text";
+          input.inputMode = "numeric";
+          input.maxLength = 1;
+          input.setAttribute("role", "gridcell");
+          input.setAttribute("aria-label", `Row ${rowIndex + 1}, column ${columnIndex + 1}`);
+          input.value = value === "0" ? "" : value;
+          input.readOnly = value !== "0";
+          input.dataset.row = rowIndex;
+          input.dataset.column = columnIndex;
+
+          input.addEventListener("input", () => {
+            input.value = input.value.replace(/[^1-9]/g, "").slice(-1);
+            input.classList.remove("invalid");
+            document.getElementById("status").textContent = "";
+          });
+
+          board.append(input);
+        });
+      });
+    }
+
+    function checkBoard() {
+      const cells = [...document.querySelectorAll(".cell")];
+      let complete = true;
+      let correct = true;
+
+      cells.forEach((cell) => {
+        const row = Number(cell.dataset.row);
+        const column = Number(cell.dataset.column);
+        const expected = solutions[puzzleIndex][row][column];
+        cell.classList.remove("invalid");
+
+        if (!cell.value) complete = false;
+        if (cell.value && cell.value !== expected) {
+          correct = false;
+          cell.classList.add("invalid");
+        }
+      });
+
+      const status = document.getElementById("status");
+      if (!complete) {
+        status.textContent = "Keep going — finish every square.";
+      } else if (correct) {
+        status.textContent = "Solved! Nice work.";
+      } else {
+        status.textContent = "Some numbers are incorrect.";
+      }
+    }
+
+    document.getElementById("check").addEventListener("click", checkBoard);
+    document.getElementById("new-game").addEventListener("click", () => {
+      puzzleIndex = (puzzleIndex + 1) % puzzles.length;
+      renderPuzzle(puzzleIndex);
+    });
+
+    renderPuzzle(puzzleIndex);
+  </script>
+</body>
+</html>
