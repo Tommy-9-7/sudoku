@@ -32,11 +32,11 @@ canvas{display:block;width:100%;height:auto;aspect-ratio:8/3;border:2px solid va
 </section>
 </main>
 <script>
-const cv=document.getElementById("c"),ctx=cv.getContext("2d"),W=800,H=300,GY=250,PX=90;
+const cv=document.getElementById("c"),ctx=cv.getContext("2d"),W=800,SH=300,GY=250,PX=90;
 let best=0;try{best=+localStorage.getItem("run_best")||0}catch(e){}
 let name="";try{name=localStorage.getItem("sdk_name")||""}catch(e){}
 const SB_URL="https://xbuofvrluzbzzedfohrd.supabase.co",SB_KEY="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
-const H={apikey:SB_KEY,"Content-Type":"application/json"};
+const API_HEADERS={apikey:SB_KEY,"Content-Type":"application/json"};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let roundSaved=false;
 let st="ready",sp,dist=0,obs,nextGap,py,vy,wr,overT=0,last=0,bonus=0,smoke=[],pops=[];
@@ -57,7 +57,7 @@ function askName(){
   input.onkeydown=e=>{if(e.key==="Enter")save()};
 }
 async function runnerApi(path,opt){
-  const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H,...opt});
+  const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:API_HEADERS,...opt});
   if(!r.ok)throw new Error(r.status);
   return opt&&opt.method==="POST"?null:r.json();
 }
@@ -82,7 +82,7 @@ async function saveRunnerScore(score){
   if(roundSaved||!name||!Number.isFinite(score)||score<=0||score>100000||name.length>20)return;
   roundSaved=true;
   try{
-    await runnerApi("runner_scores",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({name:name.trim(),score:Math.floor(score)})});
+    await runnerApi("runner_scores",{method:"POST",headers:{...API_HEADERS,Prefer:"return=minimal"},body:JSON.stringify({name:name.trim(),score:Math.floor(score)})});
     await refreshLeaderboard();
   }catch(e){
     roundSaved=false;
@@ -242,13 +242,13 @@ function cop(x){
 }
 function txt(s,x,y,size,col,al){ctx.font="bold "+size+"px system-ui,sans-serif";ctx.fillStyle=col;ctx.textAlign=al||"center";ctx.fillText(s,x,y)}
 function draw(){
-  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,SH);
   ctx.fillStyle="rgba(255,200,120,.3)";ctx.beginPath();ctx.arc(610,222,84,0,7);ctx.fill();
   ctx.fillStyle="#ffb347";ctx.beginPath();ctx.arc(610,222,38,0,7);ctx.fill();
   for(let i=0;i<4;i++)cloud((((i*260-dist*.05)%1040)+1040)%1040-120,40+(i%2)*38);
   tile(farLayer,dist*.08,600);
   tile(landmark,dist*.25,1200);
-  ctx.fillStyle="#2e2a35";ctx.fillRect(0,GY,W,H-GY);
+  ctx.fillStyle="#2e2a35";ctx.fillRect(0,GY,W,SH-GY);
   ctx.fillStyle="#4a4350";ctx.fillRect(0,GY,W,4);
   ctx.fillStyle="#6d6575";for(let x=-(dist%60);x<W;x+=60)ctx.fillRect(x,GY+24,30,3);
   for(const s of smoke){ctx.fillStyle="rgba(35,30,42,"+Math.max(0,s.a)+")";ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()}
@@ -266,7 +266,7 @@ function draw(){
     txt("Tippen oder Leertaste zum Starten",W/2,132,18,"#fff");
     txt("Polizisten umfahren = +50 Punkte",W/2,158,16,"#ffe066");
   }else if(st==="over"){
-    ctx.fillStyle="rgba(0,0,0,.4)";ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(0,0,0,.4)";ctx.fillRect(0,0,W,SH);
     txt("Erwischt!",W/2,115,40,"#fff");
     txt("Punkte: "+score()+"   Rekord: "+best,W/2,150,20,"#fff");
     txt("Tippen für einen neuen Versuch",W/2,182,18,"#fff");
