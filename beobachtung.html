@@ -30,6 +30,25 @@
     .start-link { display:inline-block; margin-bottom:10px; color:var(--acc); text-decoration:none; font-weight:600; }
     h1 { margin:8px 0 8px; font-size:24px; }
     p { color:var(--mut); }
+    .form { display:grid; gap:10px; margin:16px 0 20px; }
+    .form label { font-weight:700; }
+    .form input,.form textarea { width:100%; box-sizing:border-box; border:1px solid var(--line);
+      border-radius:10px; background:var(--card); color:var(--fg); font:inherit; }
+    .form input { padding:13px; }
+    .form textarea { min-height:100px; resize:vertical; padding:12px; }
+    .form-row { display:flex; align-items:center; gap:8px; }
+    .counter { color:var(--mut); margin-right:auto; }
+    .submit { min-height:48px; border:1px solid var(--acc); border-radius:10px;
+      background:var(--acc); color:white; padding:0 18px; font:inherit; font-weight:700; cursor:pointer; }
+    .submit:disabled { opacity:.55; cursor:not-allowed; }
+    .message { min-height:22px; margin:0; color:#d33; }
+    .observations { display:grid; gap:10px; }
+    .observation { padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+    .observation-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+    .observation-meta { display:flex; justify-content:space-between; gap:8px; margin-top:8px;
+      color:var(--mut); font-size:14px; }
+    .observation-meta strong { color:var(--fg); }
+    .empty { color:var(--mut); }
     .ov { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center;
       padding:16px; background:rgba(0,0,0,.65); box-sizing:border-box; }
     .modal { width:100%; max-width:380px; padding:16px; box-sizing:border-box;
@@ -45,25 +64,87 @@
   <main>
     <a class="start-link" href="index.html">← Startseite</a>
     <h1>Tagesbeobachtung</h1>
-    <p>Kommt bald.</p>
+    <p>Schreib auf, was dir heute aufgefallen ist.</p>
+    <div class="form">
+      <label for="observerName">Dein Name</label>
+      <input id="observerName" type="text" maxlength="20" autocomplete="name" placeholder="Name">
+      <label for="observationText">Beobachtung</label>
+      <textarea id="observationText" maxlength="280" rows="4" placeholder="Mir ist aufgefallen …"></textarea>
+      <div class="form-row">
+        <span class="counter" id="counter">0 / 280</span>
+        <button class="submit" id="submit" type="button">Veröffentlichen</button>
+      </div>
+      <p class="message" id="message" role="status"></p>
+    </div>
+    <h2>Beobachtungen</h2>
+    <section class="observations" id="observations" aria-live="polite">
+      <p class="empty">Lade Beobachtungen …</p>
+    </section>
   </main>
   <script>
-    let name="";
+    const SB_URL="https://xbuofvrluzbzzedfohrd.supabase.co";
+    const SB_KEY="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
+    const API_HEADERS={apikey:SB_KEY,"Content-Type":"application/json"};
+    const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    let name="",posting=false;
     try{name=localStorage.getItem("sdk_name")||""}catch(e){}
-    if(!name){
-      const ov=document.createElement("div");ov.className="ov";
-      ov.innerHTML='<div class="modal" role="dialog" aria-modal="true"><h2>Wie heißt du?</h2><input id="nm" maxlength="20" placeholder="Benutzername" autocomplete="off"><button id="saveName" type="button">Los geht’s</button></div>';
-      document.body.appendChild(ov);
-      const input=document.getElementById("nm");input.focus();
-      function save(){
-        const value=input.value.trim();
-        if(!value)return;
-        try{localStorage.setItem("sdk_name",value)}catch(e){}
-        ov.remove();
-      }
-      document.getElementById("saveName").onclick=save;
-      input.onkeydown=e=>{if(e.key==="Enter")save()};
+    document.getElementById("observerName").value=name;
+
+    async function observationsApi(path,opt){
+      const response=await fetch(SB_URL+"/rest/v1/"+path,{headers:API_HEADERS,...opt});
+      if(!response.ok)throw new Error(response.status);
+      return opt&&opt.method==="POST"?null:response.json();
     }
+
+    async function loadObservations(){
+      const box=document.getElementById("observations");
+      box.innerHTML='<p class="empty">Lade Beobachtungen …</p>';
+      try{
+        const rows=await observationsApi("observations?select=name,text,created_at&order=created_at.desc&limit=300");
+        if(!rows.length){box.innerHTML='<p class="empty">Noch keine Beobachtungen.</p>';return}
+        box.innerHTML=rows.map(row=>{
+          const date=new Date(row.created_at).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+          return `<article class="observation"><div class="observation-text">${esc(row.text)}</div><footer class="observation-meta"><strong>${esc(row.name)}</strong><time>${esc(date)}</time></footer></article>`;
+        }).join("");
+      }catch(e){
+        box.innerHTML='<p class="message">Die Beobachtungen können gerade nicht geladen werden.</p>';
+      }
+    }
+
+    const observationText=document.getElementById("observationText");
+    observationText.oninput=()=>{document.getElementById("counter").textContent=observationText.value.length+" / 280"};
+
+    document.getElementById("submit").onclick=async()=>{
+      if(posting)return;
+      const observerName=document.getElementById("observerName").value.trim();
+      const text=observationText.value.trim();
+      const message=document.getElementById("message");
+      message.style.color="#d33";
+      message.textContent="";
+      if(!observerName){message.textContent="Bitte gib deinen Namen ein.";return}
+      if(!text){message.textContent="Bitte schreibe eine Beobachtung.";return}
+      if(text.length>280){message.textContent="Die Beobachtung darf maximal 280 Zeichen lang sein.";return}
+      posting=true;
+      const button=document.getElementById("submit");button.disabled=true;
+      try{
+        await observationsApi("observations",{method:"POST",headers:{...API_HEADERS,Prefer:"return=minimal"},body:JSON.stringify({name:observerName.slice(0,20),text:text.slice(0,280)})});
+        name=observerName.slice(0,20);
+        try{localStorage.setItem("sdk_name",name)}catch(e){}
+        observationText.value="";
+        document.getElementById("counter").textContent="0 / 280";
+        message.style.color="var(--acc)";
+        message.textContent="Deine Beobachtung wurde veröffentlicht.";
+        await loadObservations();
+      }catch(e){
+        message.style.color="#d33";
+        message.textContent="Die Beobachtung konnte nicht gespeichert werden.";
+      }finally{
+        posting=false;
+        button.disabled=false;
+      }
+    };
+
+    loadObservations();
   </script>
 </body>
 </html>

@@ -40,6 +40,7 @@ Lege die zusätzlichen Tabellen im Supabase-SQL-Editor an:
 2. Kopiere den vollständigen SQL-Inhalt in den SQL-Editor des Supabase-Projekts und führe ihn aus.
 3. Öffne die Datei `supabase/runner_scores.sql`.
 4. Kopiere den vollständigen SQL-Inhalt in denselben SQL-Editor und führe ihn aus.
+5. Öffne die Datei `supabase/observations.sql` und führe sie ebenfalls aus, um die öffentliche Beobachtungstabelle einzurichten.
 
 Die SQL-Dateien erstellen jeweils:
 
