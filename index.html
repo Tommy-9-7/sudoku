@@ -71,7 +71,7 @@ function generate(clues,rand){
 }
 
 /* ---------- Highscores (Supabase) ---------- */
-const SB_URL = "https://tommy-9-7.github.io/sudoku/", SB_KEY ="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
+const SB_URL = "https://xbuofvrluzbzzedfohrd.supabase.co", SB_KEY ="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
 const H={apikey:SB_KEY,"Content-Type":"application/json"};
 async function api(path,opt){const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H,...opt});if(!r.ok)throw new Error(r.status);return opt&&opt.method==="POST"?null:r.json()}
 async function refresh(){
