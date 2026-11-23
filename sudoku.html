@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sudoku</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1d1d1b;--mut:#77756e;--line:#c9c6bb;--cell:#fff;--sel:#bcd7ff;--peer:#edf2fa;--usr:#1a5fd0;--err:#d33;--acc:#1a5fd0;--card:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ececE6;--mut:#9a988f;--line:#4a4944;--cell:#232321;--sel:#27456f;--peer:#2a2d33;--usr:#7db0ff;--err:#ff6b6b;--acc:#7db0ff;--card:#232321}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ececE6;--mut:#9a988f;--line:#4a4944;--cell:#232321;--sel:#27456f;--peer:#2a2d33;--usr:#7db0ff;--err:#ff6b6b;--acc:#7db0ff;--card:#232321}
+html,body{height:auto}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:460px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:8px 0 4px}p.m{color:var(--mut);margin:0 0 12px}
+button,input{font:inherit;color:inherit}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;width:100%;text-align:left;margin:4px 0}
+.btn.p{background:var(--acc);color:var(--bg);border-color:var(--acc);text-align:center;font-weight:600}
+.btn.mc{background:#d33;color:#fff;border-color:#d33;text-align:center;font-weight:700}
+.row{display:flex;gap:6px}.row>*{flex:1}
+input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--cell);margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(9,1fr);border:2px solid var(--fg);width:100%;aspect-ratio:1;margin:8px 0;user-select:none}
+.c{background:var(--cell);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:clamp(16px,6vw,26px);color:var(--usr);cursor:pointer;position:relative}
+.c.g{color:var(--fg);font-weight:600}.c.p{background:var(--peer)}.c.h{background:var(--sel)}.c.s{background:var(--sel);outline:2px solid var(--acc);z-index:1}.c.e{color:var(--err)}
+.c.r{border-right:2px solid var(--fg)}.c.b{border-bottom:2px solid var(--fg)}
+.n{display:grid;grid-template-columns:repeat(3,1fr);font-size:clamp(7px,2.2vw,10px);line-height:1;color:var(--mut);width:100%;height:100%;padding:2px;box-sizing:border-box;text-align:center}
+.pad{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}.pad .btn{text-align:center;padding:10px 0;margin:0}
+.pad .btn.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}.pad .btn.dn{color:var(--mut)}
+.top{display:flex;justify-content:space-between;align-items:center;color:var(--mut)}
+.start-link{display:inline-block;margin-bottom:10px;color:var(--acc);text-decoration:none;font-weight:600}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}.tabs button{flex:1;padding:8px 4px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer}
+.tabs button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.lb{display:flex;justify-content:space-between;padding:8px 4px;border-bottom:1px solid var(--line)}.lb.me{font-weight:700;color:var(--acc)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;box-sizing:border-box}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:14px;max-width:380px;width:100%;padding:16px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.modal img{width:100%;max-height:50vh;object-fit:cover;border-radius:10px;display:block;margin:0 auto 12px}
+.modal h2{font-size:20px;margin:0 0 12px}
+</style></head><body><main><a class="start-link" href="index.html">← Startseite</a><div id="app"></div></main>
+<script>
+const CATS={leicht:["Leicht",40],mittel:["Mittel",34],schwer:["Schwer",29],extrem:["Extrem",23]};
+const MC_IMG="therock.jpg";
+const $=s=>document.querySelector(s),app=$("#app");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const today=()=>new Date().toLocaleDateString("sv");
+const fmt=ms=>{const s=Math.round(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+let online=true,docs=[],dailyRow=null,name="",tab="leicht",game=null,timer=null,cells=[];
+try{name=localStorage.getItem("sdk_name")||""}catch(e){}
+
+/* ---------- Generator & Solver ---------- */
+function rng(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const hash=s=>{let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
+const pop=m=>{let k=0;while(m){m&=m-1;k++}return k};
+const same=(i,s)=>(i/9|0)===(s/9|0)||i%9===s%9||box(i)===box(s);
+const box=i=>((i/27|0)*3)+((i%9/3)|0);
+// zählt Lösungen (bis limit); mit rand wird eine zufällige Lösung in g geschrieben
+function search(g,limit,rand){
+  const r=new Int16Array(9),c=new Int16Array(9),b=new Int16Array(9);
+  for(let i=0;i<81;i++)if(g[i]){const m=1<<g[i];r[i/9|0]|=m;c[i%9]|=m;b[box(i)]|=m}
+  let n=0;
+  (function go(){
+    if(n>=limit)return;
+    let best=-1,bm=0,bc=10;
+    for(let i=0;i<81;i++)if(!g[i]){const m=~(r[i/9|0]|c[i%9]|b[box(i)])&0x3FE,k=pop(m);if(k<bc){bc=k;best=i;bm=m;if(k<2)break}}
+    if(best<0){n++;return}
+    if(!bc)return;
+    let ds=[];for(let d=1;d<=9;d++)if(bm&(1<<d))ds.push(d);
+    if(rand)for(let i=ds.length-1;i>0;i--){const j=rand()*(i+1)|0;[ds[i],ds[j]]=[ds[j],ds[i]]}
+    const y=best/9|0,x=best%9,bx=box(best);
+    for(const d of ds){const m=1<<d;g[best]=d;r[y]|=m;c[x]|=m;b[bx]|=m;go();
+      if(rand&&n)return; r[y]&=~m;c[x]&=~m;b[bx]&=~m;g[best]=0;if(n>=limit)return}
+  })();
+  return n;
+}
+function generate(clues,rand){
+  const sol=new Int8Array(81);search(sol,1,rand);
+  const puz=sol.slice(),order=[...Array(81).keys()];
+  for(let i=80;i>0;i--){const j=rand()*(i+1)|0;[order[i],order[j]]=[order[j],order[i]]}
+  let left=81;
+  for(const i of order){if(left<=clues)break;const v=puz[i];puz[i]=0;
+    if(search(puz.slice(),2)!==1)puz[i]=v;else left--}
+  return{puz,sol};
+}
+
+/* ---------- Highscores (Supabase) ---------- */
+const SB_URL = "https://xbuofvrluzbzzedfohrd.supabase.co", SB_KEY ="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
+const H={apikey:SB_KEY,"Content-Type":"application/json"};
+async function api(path,opt){const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H,...opt});if(!r.ok)throw new Error(r.status);return opt&&opt.method==="POST"?null:r.json()}
+async function refresh(){
+  try{
+    docs=await api(`results?select=name,ms&cat=eq.${tab}${tab==="tag"?"&day=eq."+today():""}&ms=not.is.null&order=ms.asc&limit=300`);
+    if(name){const d=await api(`results?select=ms&cat=eq.tag&day=eq.${today()}&name=eq.${encodeURIComponent(name)}`);dailyRow=d[0]||null}
+    online=true;
+  }catch(e){online=false}
+  if(!game)render();
+}
+async function record(ms,cat,daily){
+  try{await api("results",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({name,cat:daily?"tag":cat,ms,day:daily?today():null})})}catch(e){}
+}
+async function init(){render();refresh()}
+
+/* ---------- Ansichten ---------- */
+function render(){
+  clearInterval(timer);game=null;
+  if(!name){
+    app.innerHTML=`<h1>Sudoku</h1><p class="m">Wähle einen Benutzernamen. Deine Freunde sehen ihn in der Bestenliste.</p><input id="nm" maxlength="20" placeholder="Benutzername" autocomplete="off"><button class="btn p" id="go">Los geht’s</button>`;
+    $("#go").onclick=()=>{const v=$("#nm").value.trim();if(!v)return;name=v;try{localStorage.setItem("sdk_name",v)}catch(e){}render();refresh()};
+    return;
+  }
+  const dd=dailyRow?(dailyRow.ms||-1):null;
+  const seen=new Set(),rows=[];for(const r of docs)if(!seen.has(r.name)){seen.add(r.name);rows.push([r.name,r.ms,r.name])}
+  const tabs=[...Object.entries(CATS).map(([k,v])=>[k,v[0]]),["tag","Tages-Sudoku"]];
+  app.innerHTML=`<h1>Sudoku</h1><p class="m">Hallo ${esc(name)}</p>
+  <div class="row">${Object.entries(CATS).map(([k,v])=>`<button class="btn p" data-k="${k}">${v[0]}</button>`).join("")}</div>
+  <button class="btn" id="dl">Tages-Sudoku (extrem) – ${dd>0?"gelöst in "+fmt(dd):dd===-1?"verloren":"noch offen"}</button>
+  <h1 style="font-size:18px;margin-top:20px">Bestenliste</h1>
+  <div class="tabs">${tabs.map(([k,l])=>`<button data-t="${k}" class="${k===tab?"on":""}">${l}</button>`).join("")}</div>
+  ${rows.length?rows.map((r,i)=>`<div class="lb ${r[2]===name?"me":""}"><span>${i+1}. ${esc(r[0])}</span><span>${fmt(r[1])}</span></div>`).join(""):`<p class="m">Noch keine Zeiten.${online?"":" (Bestenliste nicht erreichbar)"}</p>`}`;
+  app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>start(b.dataset.k,false));
+  app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{tab=b.dataset.t;docs=[];render();refresh()});
+  $("#dl").onclick=()=>{if(dd){tab="tag";render()}else start("extrem",true)};
+}
+
+/* ---------- Spiel ---------- */
+function start(cat,daily){
+  app.innerHTML=`<p class="m">Erzeuge Rätsel …</p>`;
+  setTimeout(()=>{
+    const rand=rng(daily?hash("sudoku-"+today()):(Math.random()*4294967296)>>>0);
+    const{puz,sol}=generate(CATS[cat][1],rand);
+    game={cat,daily,puz,sol,cur:puz.slice(),notes:new Int16Array(81),sel:-1,notesOn:false,t0:Date.now(),done:false};
+    renderGame();
+  },30);
+}
+function renderGame(){
+  app.innerHTML=`<div id="fb"></div><div class="top"><button class="btn" id="back" style="width:auto;margin:0">← Zurück</button><span>${game.daily?"Tages-Sudoku":CATS[game.cat][0]}</span><b id="t">0:00</b></div>
+  <div class="grid" id="g"></div>
+  <div class="pad">${[1,2,3,4,5,6,7,8,9].map(d=>`<button class="btn" data-d="${d}">${d}</button>`).join("")}</div>
+  <div class="row" style="margin-top:6px"><button class="btn" id="nt" style="text-align:center">Notizen: aus</button><button class="btn" id="nf" style="text-align:center">Zahl zuerst: aus</button><button class="btn" id="er" style="text-align:center">Löschen</button></div>`;
+  const g=$("#g");cells=[];
+  for(let i=0;i<81;i++){const el=document.createElement("div");el.onclick=()=>{game.sel=i;if(game.numFirst&&game.active)put(game.active);else draw()};
+    el.dataset.x=i%9%3===2&&i%9<8?"r":"";el.dataset.y=((i/9|0)%3===2&&i<72)?"b":"";g.appendChild(el);cells.push(el)}
+  app.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{const d=+b.dataset.d;if(game.numFirst){game.active=game.active===d?0:d;draw()}else put(d)});
+  $("#er").onclick=()=>put(0);
+  $("#nt").onclick=()=>{game.notesOn=!game.notesOn;$("#nt").textContent="Notizen: "+(game.notesOn?"an":"aus")};
+  $("#nf").onclick=()=>{game.numFirst=!game.numFirst;game.active=0;$("#nf").textContent="Zahl zuerst: "+(game.numFirst?"an":"aus");draw()};
+  $("#back").onclick=()=>{render();refresh()};
+  timer=setInterval(()=>{if(!game.done)$("#t").textContent=fmt(Date.now()-game.t0)},500);
+  draw();
+}
+function draw(){
+  const s=game.sel;
+  cells.forEach((el,i)=>{
+    const v=game.cur[i];
+    el.className="c"+(game.puz[i]?" g":"")+(i===s?" s":"")+(i===game.bad?" e":"")+(el.dataset.x?" r":"")+(el.dataset.y?" b":"");
+    if(v)el.textContent=v;
+    else{let h="";for(let d=1;d<=9;d++)h+=`<span>${game.notes[i]&(1<<d)?d:""}</span>`;el.innerHTML=`<div class="n">${h}</div>`}
+  });
+  const cnt=Array(10).fill(0);game.cur.forEach(v=>cnt[v]++);
+  app.querySelectorAll("[data-d]").forEach(b=>{const d=+b.dataset.d;b.textContent=cnt[d]>=9?d+"✓":d;b.classList.toggle("dn",cnt[d]>=9);b.classList.toggle("on",!!game.numFirst&&game.active===d)});
+}
+function put(d){
+  const s=game.sel;if(s<0||game.puz[s]||game.done)return;
+  if(game.notesOn&&d){if(!game.cur[s])game.notes[s]^=1<<d}
+  else{game.cur[s]=d;game.notes[s]=0;
+    if(d)for(let i=0;i<81;i++)if(same(i,s))game.notes[i]&=~(1<<d)}
+  if(d&&!game.notesOn&&d!==game.sol[s]){game.bad=s;draw();fail();return}
+  draw();
+  if(game.cur.every((v,i)=>v===game.sol[i]))finish();
+}
+async function fail(){
+  game.done=true;
+  $("#fb").innerHTML=`<div class="btn" style="text-align:center"><b>Falsche Zahl – das Spiel ist vorbei.</b><br><button class="btn mc" id="mc" style="margin-top:8px">ES WAR NUR EIN MISSCLICK!</button></div>`;
+  $("#mc").onclick=askMissclick;
+}
+function askMissclick(){
+  const ov=document.createElement("div");ov.className="ov";
+  ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><img src="${MC_IMG}" alt=""><h2>Bist du dir sicher, dass es nur ein Missclick war?</h2>
+  <button class="btn p" id="mcy">Ja, ganz sicher</button><button class="btn" id="mcn" style="text-align:center">Nein, ehrlich gesagt nicht</button></div>`;
+  document.body.appendChild(ov);
+  $("#mcn").onclick=async()=>{
+    ov.remove();
+    if(game&&game.daily){await record(null,"extrem",true);dailyRow={ms:null};tab="tag"}
+  };
+  $("#mcy").onclick=()=>{
+    ov.remove();
+    if(!game||game.bad==null||game.bad<0)return;
+    game.cur[game.bad]=0;game.bad=-1;game.done=false;
+    $("#fb").innerHTML="";
+    draw();
+  };
+}
+async function finish(){
+  game.done=true;const ms=Date.now()-game.t0;
+  await record(ms,game.cat,game.daily);if(game.daily)dailyRow={ms};
+  $("#fb").innerHTML=`<div class="btn" style="text-align:center"><b>Geschafft in ${fmt(ms)}!</b></div>`;
+  if(game.daily)tab="tag";else tab=game.cat;
+}
+document.addEventListener("keydown",e=>{
+  if(!game||game.done)return;
+  if(e.key>="1"&&e.key<="9")put(+e.key);
+  else if(e.key==="Backspace"||e.key==="Delete"||e.key==="0")put(0);
+  else if(e.key==="n"||e.key==="N")$("#nt").click();
+  else{const m={ArrowUp:-9,ArrowDown:9,ArrowLeft:-1,ArrowRight:1}[e.key];
+    if(m){e.preventDefault();game.sel=Math.max(0,Math.min(80,(game.sel<0?40:game.sel)+m));draw()}}
+});
+init();
+</script></body></html>
