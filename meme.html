@@ -33,19 +33,25 @@
     .tabs button { flex:1; }
     .tabs button.on { border-color:var(--acc); background:var(--acc); color:white; }
     .hidden { display:none !important; }
-    .meme-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .daily-meme { display:block; width:100%; max-height:520px; object-fit:contain;
+      border:1px solid var(--line); border-radius:14px; background:var(--card); }
+    .meme-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px; }
     @media (max-width:520px) { .meme-grid { grid-template-columns:1fr; } }
     .meme-card { overflow:hidden; border:1px solid var(--line); border-radius:14px; background:var(--card); }
-    .meme-card img { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#ddd; }
-    .meme-card footer { display:flex; justify-content:space-between; gap:8px; padding:10px 12px; }
-    .meme-card strong { overflow:hidden; text-overflow:ellipsis; }
-    .meme-card time { color:var(--mut); white-space:nowrap; }
+    .meme-card img { display:block; width:100%; aspect-ratio:4/3; object-fit:contain; background:#ddd; }
+    .meme-card-text { padding:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .meme-card footer { display:flex; justify-content:space-between; gap:8px; padding:0 12px 12px; color:var(--mut); }
+    .meme-card strong { color:var(--fg); overflow:hidden; text-overflow:ellipsis; }
+    .meme-card time { white-space:nowrap; }
     .form { display:grid; gap:10px; margin-top:4px; }
     .form label { font-weight:700; }
     .form input[type="text"] { width:100%; box-sizing:border-box; padding:13px;
       border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--fg); font:inherit; }
-    .form input[type="file"] { width:100%; box-sizing:border-box; padding:10px;
-      border:1px dashed var(--line); border-radius:10px; background:var(--card); }
+    textarea { width:100%; min-height:92px; resize:vertical; box-sizing:border-box;
+      padding:12px; border:1px solid var(--line); border-radius:10px;
+      background:var(--card); color:var(--fg); font:inherit; }
+    .form-row { display:flex; align-items:center; gap:8px; }
+    .counter { color:var(--mut); margin-right:auto; }
     button { min-height:48px; border:1px solid var(--line); border-radius:10px;
       background:var(--card); color:var(--fg); font:inherit; cursor:pointer; }
     .submit { border-color:var(--acc); background:var(--acc); color:white; font-weight:700; }
@@ -65,21 +71,25 @@
 <body>
   <main>
     <a class="start-link" href="index.html">← Startseite</a>
-    <h1>Memes</h1>
+    <h1>Tagesmeme</h1>
+    <img class="daily-meme" id="memeImage" alt="Tagesmeme">
     <div class="tabs" aria-label="Memebereich">
-      <button id="browseTab" class="on" type="button">Gepostete Memes</button>
-      <button id="addTab" type="button">Eigenes Meme hinzufügen</button>
+      <button id="browseTab" class="on" type="button">Gepostete Texte</button>
+      <button id="addTab" type="button">Eigenen Text hinzufügen</button>
     </div>
-    <section id="browseView" aria-label="Gepostete Memes">
-      <div class="meme-grid" id="memeGrid"><p class="empty">Lade Memes …</p></div>
+    <section id="browseView" aria-label="Gepostete Texte">
+      <div class="meme-grid" id="memeGrid"><p class="empty">Lade Beiträge …</p></div>
     </section>
-    <section id="addView" class="hidden" aria-label="Eigenes Meme hinzufügen">
+    <section id="addView" class="hidden" aria-label="Eigenen Text hinzufügen">
       <div class="form">
         <label for="memeName">Dein Name</label>
         <input id="memeName" type="text" maxlength="20" autocomplete="name" placeholder="Name">
-        <label for="memeFile">Meme-Bild</label>
-        <input id="memeFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
-        <button class="submit" id="submit" type="button">Meme veröffentlichen</button>
+        <label for="memeText">Dein Satz zum Bild</label>
+        <textarea id="memeText" maxlength="140" rows="3" placeholder="Dein Satz zum Bild …"></textarea>
+        <div class="form-row">
+          <span class="counter" id="counter">0 / 140</span>
+          <button class="submit" id="submit" type="button">Absenden</button>
+        </div>
         <p class="message" id="message" role="status"></p>
       </div>
     </section>
@@ -94,43 +104,45 @@
     try{name=localStorage.getItem("sdk_name")||""}catch(e){}
     let posting=false;
 
-    function askName(){
-      const ov=document.createElement("div");ov.className="ov";
-      ov.innerHTML='<div class="modal" role="dialog" aria-modal="true"><h2>Wie heißt du?</h2><input id="nm" maxlength="20" placeholder="Benutzername" autocomplete="off"><button id="saveName" type="button">Los geht’s</button></div>';
-      document.body.appendChild(ov);
-      const input=document.getElementById("nm");input.focus();
-      function save(){
-        const value=input.value.trim();
-        if(!value)return;
-        name=value;
-        try{localStorage.setItem("sdk_name",value)}catch(e){}
-        ov.remove();
-      }
-      document.getElementById("saveName").onclick=save;
-      input.onkeydown=e=>{if(e.key==="Enter")save()};
-    }
-
     async function memeApi(path,opt){
       const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:API_HEADERS,...opt});
       if(!r.ok)throw new Error(r.status);
       return opt&&opt.method==="POST"?null:r.json();
     }
 
+    async function initImage(){
+      try{
+        const response=await fetch("memes/memes.json",{cache:"no-store"});
+        if(!response.ok)throw new Error();
+        const images=await response.json();
+        if(!Array.isArray(images)||!images.length)throw new Error();
+        const [y,m,d]=today().split("-").map(Number);
+        const epoch=Date.UTC(y,m-1,d);
+        const days=Math.floor(epoch/86400000);
+        const index=((days%images.length)+images.length)%images.length;
+        document.getElementById("memeImage").src="memes/"+encodeURIComponent(images[index]);
+      }catch(e){
+        document.getElementById("memeImage").alt="Das Tagesbild konnte nicht geladen werden.";
+      }
+    }
+
     async function loadMemes(){
       const box=document.getElementById("memeGrid");
-      box.innerHTML='<p class="empty">Lade Memes …</p>';
+      box.innerHTML='<p class="empty">Lade Beiträge …</p>';
       try{
-        const rows=await memeApi("meme_posts?select=name,image_url,created_at&order=created_at.desc&limit=300");
-        if(!rows.length){box.innerHTML='<p class="empty">Noch keine Memes gepostet.</p>';return}
+        const rows=await memeApi(`meme_comments?select=name,text,created_at&day=eq.${today()}&order=created_at.desc&limit=300`);
+        if(!rows.length){box.innerHTML='<p class="empty">Noch keine Texte für das heutige Meme.</p>';return}
         box.innerHTML=rows.map(row=>{
           const date=new Date(row.created_at).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
-          return `<article class="meme-card"><img src="${esc(row.image_url)}" alt="Von ${esc(row.name)} gepostetes Meme" loading="lazy"><footer><strong>${esc(row.name)}</strong><time>${esc(date)}</time></footer></article>`;
+          return `<article class="meme-card"><img class="meme-card-image" src="${esc(document.getElementById("memeImage").src)}" alt="Tagesmeme" loading="lazy"><div class="meme-card-text">${esc(row.text)}</div><footer><strong>${esc(row.name)}</strong><time>${esc(date)}</time></footer></article>`;
         }).join("");
       }catch(e){
         box.innerHTML='<p class="message">Die Beiträge können gerade nicht geladen werden. Bitte versuche es später erneut.</p>';
       }
     }
     document.getElementById("memeName").value=name;
+    const memeText=document.getElementById("memeText");
+    memeText.oninput=()=>{document.getElementById("counter").textContent=memeText.value.length+" / 140"};
 
     document.getElementById("browseTab").onclick=()=>{
       document.getElementById("browseTab").className="on";
@@ -149,43 +161,37 @@
     document.getElementById("submit").onclick=async()=>{
       if(posting)return;
       const nameInput=document.getElementById("memeName");
-      const fileInput=document.getElementById("memeFile");
+      const text=memeText.value.trim();
       const poster=nameInput.value.trim();
-      const file=fileInput.files&&fileInput.files[0];
       const message=document.getElementById("message");
       message.textContent="";
       if(!poster){message.textContent="Bitte gib deinen Namen ein.";return}
       if(poster.length>20){message.textContent="Der Name darf maximal 20 Zeichen lang sein.";return}
-      if(!file){message.textContent="Bitte wähle ein Meme-Bild aus.";return}
-      if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)){message.textContent="Bitte nur JPG, PNG, WebP oder GIF verwenden.";return}
-      if(file.size>5*1024*1024){message.textContent="Das Bild darf maximal 5 MB groß sein.";return}
+      if(!text){message.textContent="Bitte gib einen Satz ein.";return}
+      if(text.length>140){message.textContent="Der Satz darf maximal 140 Zeichen lang sein.";return}
+      let last=0;try{last=+(localStorage.getItem("meme_last_post")||0)}catch(e){}
+      const remaining=30000-(Date.now()-last);
+      if(remaining>0){message.textContent=`Bitte warte noch ${Math.ceil(remaining/1000)} Sekunden.`;return}
       posting=true;
       const button=document.getElementById("submit");button.disabled=true;
       try{
-        const extension=file.type==="image/jpeg"?"jpg":file.type==="image/png"?"png":file.type==="image/webp"?"webp":"gif";
-        const randomId=crypto.randomUUID?crypto.randomUUID():String(Date.now())+"-"+Math.random().toString(36).slice(2);
-        const objectName=randomId+"."+extension;
-        const upload=await fetch(SB_URL+"/storage/v1/object/memes/"+encodeURIComponent(objectName),{
-          method:"POST",headers:{apikey:SB_KEY,"Content-Type":file.type,"x-upsert":"false"},body:file
-        });
-        if(!upload.ok)throw new Error("upload");
-        const imageUrl=SB_URL+"/storage/v1/object/public/memes/"+encodeURIComponent(objectName);
-        await memeApi("meme_posts",{method:"POST",headers:{...API_HEADERS,Prefer:"return=minimal"},body:JSON.stringify({name:poster.slice(0,20),image_url:imageUrl})});
+        await memeApi("meme_comments",{method:"POST",headers:{...API_HEADERS,Prefer:"return=minimal"},body:JSON.stringify({day:today(),name:poster.slice(0,20),text:text})});
+        try{localStorage.setItem("meme_last_post",String(Date.now()))}catch(e){}
         name=poster;try{localStorage.setItem("sdk_name",poster)}catch(e){}
-        fileInput.value="";
+        memeText.value="";document.getElementById("counter").textContent="0 / 140";
         message.style.color="var(--acc)";
-        message.textContent="Dein Meme wurde veröffentlicht.";
+        message.textContent="Dein Text wurde veröffentlicht.";
         await loadMemes();
         document.getElementById("browseTab").click();
       }catch(e){
         message.style.color="var(--err)";
-        message.textContent="Das Meme konnte nicht gespeichert werden. Bitte versuche es später erneut.";
+        message.textContent="Der Text konnte nicht gespeichert werden. Bitte versuche es später erneut.";
       }finally{
         posting=false;
         button.disabled=false;
       }
     };
-    loadMemes();
+    initImage().then(loadMemes);
   </script>
 </body>
 </html>

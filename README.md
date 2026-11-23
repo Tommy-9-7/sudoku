@@ -40,7 +40,6 @@ Lege die zusätzlichen Tabellen im Supabase-SQL-Editor an:
 2. Kopiere den vollständigen SQL-Inhalt in den SQL-Editor des Supabase-Projekts und führe ihn aus.
 3. Öffne die Datei `supabase/runner_scores.sql`.
 4. Kopiere den vollständigen SQL-Inhalt in denselben SQL-Editor und führe ihn aus.
-5. Für die geposteten Memes führe zusätzlich `supabase/meme_posts.sql` aus. Das erstellt die Meme-Tabelle sowie den öffentlichen Supabase-Storage-Bucket `memes`.
 
 Die SQL-Dateien erstellen jeweils:
 
