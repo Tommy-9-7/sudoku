@@ -12,6 +12,7 @@ h1{font-size:24px;margin:8px 0 4px}p.m{color:var(--mut);margin:0 0 12px}
 button,input{font:inherit;color:inherit}
 .btn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;width:100%;text-align:left;margin:4px 0}
 .btn.p{background:var(--acc);color:var(--bg);border-color:var(--acc);text-align:center;font-weight:600}
+.btn.mc{background:#d33;color:#fff;border-color:#d33;text-align:center;font-weight:700}
 .row{display:flex;gap:6px}.row>*{flex:1}
 input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--cell);margin:8px 0}
 .grid{display:grid;grid-template-columns:repeat(9,1fr);border:2px solid var(--fg);width:100%;aspect-ratio:1;margin:8px 0;user-select:none}
@@ -32,7 +33,7 @@ input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line)
 </style></head><body><main id="app"></main>
 <script>
 const CATS={leicht:["Leicht",40],mittel:["Mittel",34],schwer:["Schwer",29],extrem:["Extrem",23]};
-const MC_IMG="data:image/jpeg;base64,__IMG__";
+const MC_IMG="therock.jpg";
 const $=s=>document.querySelector(s),app=$("#app");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const today=()=>new Date().toLocaleDateString("sv");
@@ -162,17 +163,18 @@ function put(d){
 }
 async function fail(){
   game.done=true;
-  // Beim Tages-Sudoku zählt der Fehler sofort (kein Missclick-Rückgängig, sonst wäre die Bestenliste manipulierbar)
-  $("#fb").innerHTML=`<div class="btn" style="text-align:center"><b>Falsche Zahl – das Spiel ist vorbei.</b>${game.daily?"":`<br><button class="btn" id="mc" style="text-align:center;margin-top:8px">War es nur ein Missclick?</button>`}</div>`;
-  if(!game.daily)$("#mc").onclick=askMissclick;
-  if(game.daily){await record(null,"extrem",true);dailyRow={ms:null}}
+  $("#fb").innerHTML=`<div class="btn" style="text-align:center"><b>Falsche Zahl – das Spiel ist vorbei.</b><br><button class="btn mc" id="mc" style="margin-top:8px">ES WAR NUR EIN MISSCLICK!</button></div>`;
+  $("#mc").onclick=askMissclick;
 }
 function askMissclick(){
   const ov=document.createElement("div");ov.className="ov";
   ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><img src="${MC_IMG}" alt=""><h2>Bist du dir sicher, dass es nur ein Missclick war?</h2>
   <button class="btn p" id="mcy">Ja, ganz sicher</button><button class="btn" id="mcn" style="text-align:center">Nein, ehrlich gesagt nicht</button></div>`;
   document.body.appendChild(ov);
-  $("#mcn").onclick=()=>ov.remove();
+  $("#mcn").onclick=async()=>{
+    ov.remove();
+    if(game&&game.daily){await record(null,"extrem",true);dailyRow={ms:null};tab="tag"}
+  };
   $("#mcy").onclick=()=>{
     ov.remove();
     if(!game||game.bad==null||game.bad<0)return;
