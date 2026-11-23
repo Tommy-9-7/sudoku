@@ -3,24 +3,91 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dresden Runner</title>
 <style>
-:root{--bg:#fafaf7;--fg:#1d1d1b;--mut:#77756e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ececE6;--mut:#9a988f}}
-:root[data-theme="dark"]{--bg:#171716;--fg:#ececE6;--mut:#9a988f}
+ :root{--bg:#fafaf7;--fg:#1d1d1b;--mut:#77756e;--line:#c9c6bb;--card:#fff;--acc:#1a5fd0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#ececE6;--mut:#9a988f;--line:#4a4944;--card:#232321;--acc:#7db0ff}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#ececE6;--mut:#9a988f;--line:#4a4944;--card:#232321;--acc:#7db0ff}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:820px;margin:0 auto;padding:16px}
 h1{font-size:24px;margin:8px 0 4px}p{color:var(--mut);margin:0 0 12px}
 canvas{display:block;width:100%;height:auto;aspect-ratio:8/3;border:2px solid var(--fg);border-radius:10px;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.start-link{display:inline-block;margin-bottom:10px;color:var(--acc);text-decoration:none;font-weight:600}
+.lb{display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--line)}
+.lb.me{font-weight:700;color:var(--acc)}
+.lb-wrap{margin-top:16px}.lb-wrap h2{font-size:18px;margin:0 0 8px}
+.lb-status{color:var(--mut)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;box-sizing:border-box}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:14px;max-width:380px;width:100%;padding:16px;box-sizing:border-box}
+.modal h2{margin:0 0 8px;font-size:20px}
+.modal input{width:100%;box-sizing:border-box;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
+.modal button{width:100%;min-height:48px;margin-top:8px;border:1px solid var(--acc);border-radius:10px;background:var(--acc);color:var(--bg);font-weight:700}
 </style></head><body><main>
+<a class="start-link" href="index.html">← Startseite</a>
 <h1>Dresden Runner</h1>
 <p>Springen mit Tippen, Leertaste oder Pfeil nach oben. Spring über Mülleimer (auch gestapelt), brennende Barrikaden und Polizeiautos, aber nicht in die Tauben hinein. Polizisten kannst du umfahren: 50 Punkte.</p>
 <canvas id="c" width="800" height="300"></canvas>
+<section class="lb-wrap" aria-labelledby="runnerLeaderboard">
+  <h2 id="runnerLeaderboard">Bestenliste</h2>
+  <div id="runnerLb"><p class="lb-status">Lade Bestenliste …</p></div>
+</section>
 </main>
 <script>
 const cv=document.getElementById("c"),ctx=cv.getContext("2d"),W=800,H=300,GY=250,PX=90;
 let best=0;try{best=+localStorage.getItem("run_best")||0}catch(e){}
+let name="";try{name=localStorage.getItem("sdk_name")||""}catch(e){}
+const SB_URL="https://xbuofvrluzbzzedfohrd.supabase.co",SB_KEY="sb_publishable_riutnJEMFYDNjgXde83gAA_N9QMtQEP";
+const H={apikey:SB_KEY,"Content-Type":"application/json"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let roundSaved=false;
 let st="ready",sp,dist=0,obs,nextGap,py,vy,wr,overT=0,last=0,bonus=0,smoke=[],pops=[];
-function reset(){sp=6.5;dist=0;obs=[];nextGap=320;py=GY;vy=0;wr=0;bonus=0;smoke=[];pops=[]}
+function reset(){roundSaved=false;sp=6.5;dist=0;obs=[];nextGap=320;py=GY;vy=0;wr=0;bonus=0;smoke=[];pops=[]}
+function askName(){
+  const ov=document.createElement("div");ov.className="ov";
+  ov.innerHTML='<div class="modal" role="dialog" aria-modal="true"><h2>Wie heißt du?</h2><input id="nm" maxlength="20" placeholder="Benutzername" autocomplete="off"><button id="saveName" type="button">Los geht’s</button></div>';
+  document.body.appendChild(ov);
+  const input=document.getElementById("nm");input.focus();
+  function save(){
+    const value=input.value.trim();
+    if(!value)return;
+    name=value;
+    try{localStorage.setItem("sdk_name",value)}catch(e){}
+    ov.remove();refreshLeaderboard();
+  }
+  document.getElementById("saveName").onclick=save;
+  input.onkeydown=e=>{if(e.key==="Enter")save()};
+}
+async function runnerApi(path,opt){
+  const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H,...opt});
+  if(!r.ok)throw new Error(r.status);
+  return opt&&opt.method==="POST"?null:r.json();
+}
+async function refreshLeaderboard(){
+  const box=document.getElementById("runnerLb");
+  box.innerHTML='<p class="lb-status">Lade Bestenliste …</p>';
+  try{
+    const rows=await runnerApi("runner_scores?select=name,score&score=gte.0&order=score.desc&limit=300");
+    const bestByName=new Map();
+    for(const row of rows){
+      if(!row.name||!Number.isInteger(row.score)||row.score<0||row.score>100000)continue;
+      const old=bestByName.get(row.name);
+      if(old===undefined||row.score>old)bestByName.set(row.name,row.score);
+    }
+    const ranking=[...bestByName.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"de")).slice(0,10);
+    box.innerHTML=ranking.length?ranking.map((row,i)=>`<div class="lb ${row[0]===name?"me":""}"><span>${i+1}. ${esc(row[0])}</span><span>${row[1]} Punkte</span></div>`).join(""):'<p class="lb-status">Noch keine Punkte.</p>';
+  }catch(e){
+    box.innerHTML='<p class="lb-status">Die Bestenliste ist gerade nicht erreichbar.</p>';
+  }
+}
+async function saveRunnerScore(score){
+  if(roundSaved||!name||!Number.isFinite(score)||score<=0||score>100000||name.length>20)return;
+  roundSaved=true;
+  try{
+    await runnerApi("runner_scores",{method:"POST",headers:{...H,Prefer:"return=minimal"},body:JSON.stringify({name:name.trim(),score:Math.floor(score)})});
+    await refreshLeaderboard();
+  }catch(e){
+    roundSaved=false;
+  }
+}
 function jump(){
   if(st==="ready"){reset();st="run";return}
   if(st==="over"){if(performance.now()-overT>400){reset();st="run"}return}
@@ -66,6 +133,7 @@ function update(dt){
       if(o.k==="cop"){o.fly=1;o.vx=8;o.vy=-15;o.fy=0;o.rot=0;bonus+=50;pops.push({x:o.x,y:GY-80,t:0});continue}
       st="over";overT=performance.now();
       const s=score();if(s>best){best=s;try{localStorage.setItem("run_best",s)}catch(e){}}
+      saveRunnerScore(s);
       break;
     }
   }
@@ -209,5 +277,8 @@ function frame(t){
   if(st==="run")update(dt);else if(st==="ready")dist+=2*dt;
   draw();requestAnimationFrame(frame);
 }
-reset();requestAnimationFrame(frame);
+reset();
+refreshLeaderboard();
+if(!name)askName();
+requestAnimationFrame(frame);
 </script></body></html>
