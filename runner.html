@@ -158,7 +158,6 @@ function update(dt){
     const hitV=o.k==="bird"?(py-80<GY-96&&py-2>GY-112):(py-2>GY-o.h+4);
     if(PX+8<o.x+o.w-4&&PX+52>o.x+4&&hitV){
       if(o.k==="cop"){
-        if(hasBike){hitObstacle(o);break}
         o.fly=1;o.vx=8;o.vy=-15;o.fy=0;o.rot=0;bonus+=50;pops.push({x:o.x,y:GY-80,t:0});continue
       }
       hitObstacle(o);
@@ -240,17 +239,19 @@ function bike(){
   ctx.lineCap="butt";
 }
 function runner(){
-  const x=PX+27,y=py,phase=py===GY?Math.sin(wr*1.8):0;
-  ctx.fillStyle="#20202a";
-  ctx.beginPath();ctx.ellipse(x,y-5,17,5,0,0,7);ctx.fill();
-  ctx.strokeStyle="#20202a";ctx.lineWidth=7;ctx.lineCap="round";
-  ctx.beginPath();ctx.moveTo(x-3,y-17);ctx.lineTo(x-8+phase*8,y-2);ctx.lineTo(x-13+phase*10,y);ctx.moveTo(x+3,y-17);ctx.lineTo(x+8-phase*8,y-2);ctx.lineTo(x+13-phase*10,y);ctx.stroke();
-  ctx.strokeStyle="#253d73";ctx.lineWidth=11;
-  ctx.beginPath();ctx.moveTo(x,y-47);ctx.lineTo(x-3,y-20);ctx.stroke();
-  ctx.strokeStyle="#e0b48c";ctx.lineWidth=5;
-  ctx.beginPath();ctx.moveTo(x-2,y-39);ctx.lineTo(x-10-phase*5,y-27);ctx.moveTo(x+2,y-39);ctx.lineTo(x+10+phase*5,y-29);ctx.stroke();
-  ctx.fillStyle="#e0b48c";ctx.beginPath();ctx.arc(x,y-56,9,0,7);ctx.fill();
-  ctx.fillStyle="#20202a";ctx.beginPath();ctx.arc(x,y-59,9,Math.PI,Math.PI*2);ctx.fill();
+  const x=PX+29,y=py,phase=py===GY?Math.sin(wr*1.8):0;
+  ctx.strokeStyle="#111";ctx.lineWidth=8;ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.beginPath();
+  ctx.moveTo(x-4,y-27);ctx.lineTo(x-11+phase*7,y-13);ctx.lineTo(x-15+phase*9,y);
+  ctx.moveTo(x+2,y-27);ctx.lineTo(x+9-phase*7,y-13);ctx.lineTo(x+14-phase*9,y);
+  ctx.stroke();
+  ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(x-3,y-52);ctx.lineTo(x+1,y-29);ctx.stroke();
+  ctx.lineWidth=5;ctx.beginPath();
+  ctx.moveTo(x-2,y-44);ctx.lineTo(x-12-phase*5,y-32);
+  ctx.moveTo(x+1,y-44);ctx.lineTo(x+11+phase*5,y-34);ctx.stroke();
+  ctx.fillStyle="#111";ctx.beginPath();ctx.arc(x+5,y-61,8.5,0,7);ctx.fill();
+  ctx.fillStyle="#e0b48c";ctx.beginPath();ctx.arc(x+9,y-60,4.5,0,7);ctx.fill();
+  ctx.save();ctx.translate(x-1,y-39);ctx.rotate(-.16);ctx.fillStyle="#fff";ctx.font="bold 8px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("161",0,0);ctx.restore();
   ctx.lineCap="butt";
 }
 function bikePickup(o){
