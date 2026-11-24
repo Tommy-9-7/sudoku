@@ -39,8 +39,8 @@ const SB_URL="https://xbuofvrluzbzzedfohrd.supabase.co",SB_KEY="sb_publishable_r
 const API_HEADERS={apikey:SB_KEY,"Content-Type":"application/json"};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let roundSaved=false;
-let st="ready",sp,dist=0,obs,nextGap,py,vy,wr,overT=0,last=0,bonus=0,smoke=[],pops=[],ridingTram=null,hasBike=false,bikeMsgT=0,bikeMsg="";
-function reset(){roundSaved=false;sp=6.5;dist=0;obs=[];nextGap=320;py=GY;vy=0;wr=0;bonus=0;smoke=[];pops=[];ridingTram=null;hasBike=false;bikeMsgT=0;bikeMsg=""}
+let st="ready",sp,dist=0,obs,nextGap,py,vy,wr,overT=0,last=0,bonus=0,smoke=[],pops=[],ridingTram=null,hasBike=false,bikeMsgT=0,bikeMsg="",invulnT=0;
+function reset(){roundSaved=false;sp=7.2;dist=0;obs=[];nextGap=300;py=GY;vy=0;wr=0;bonus=0;smoke=[];pops=[];ridingTram=null;hasBike=false;bikeMsgT=0;bikeMsg="";invulnT=0}
 function askName(){
   const ov=document.createElement("div");ov.className="ov";
   ov.innerHTML='<div class="modal" role="dialog" aria-modal="true"><h2>Wie heißt du?</h2><input id="nm" maxlength="20" placeholder="Benutzername" autocomplete="off"><button id="saveName" type="button">Los geht’s</button></div>';
@@ -99,9 +99,10 @@ document.addEventListener("keydown",e=>{
 });
 function spawn(){
   let r=Math.random(),o;
-  if(!hasBike&&r<.08)o={k:"pickup",w:56,h:50};
+  if(r<.018)o={k:"beer",w:28,h:48};
+  else if(!hasBike&&r<.098)o={k:"pickup",w:56,h:50};
   else{
-    if(!hasBike)r=(r-.08)/.92;
+    if(!hasBike)r=(r-.098)/.902;
     if(r<.1&&dist>1200)o={k:"tram",w:560,h:74,rs:2.5};
     else if(r<.2)o={k:"bin",w:26,h:40};
     else if(r<.32)o={k:"bin2",w:58,h:40};
@@ -116,9 +117,10 @@ function spawn(){
   o.x=W+20;obs.push(o);
 }
 function update(dt){
-  sp=Math.min(14.5,sp+.0025*dt);
+  sp=Math.min(16,sp+.0032*dt);
   dist+=sp*dt;wr+=sp*dt*.09;
   bikeMsgT=Math.max(0,bikeMsgT-dt);
+  invulnT=Math.max(0,invulnT-dt);
   const previousPy=py;
   vy+=.7*dt;py+=vy*dt;if(py>=GY){py=GY;vy=0}
   for(const o of obs){
@@ -132,15 +134,18 @@ function update(dt){
   for(const p of pops){p.t+=dt;p.y-=.9*dt}
   pops=pops.filter(p=>p.t<50);
   nextGap-=sp*dt;
-  if(nextGap<=0){spawn();nextGap=sp*(34+Math.random()*34)+obs[obs.length-1].w}
+  if(nextGap<=0){spawn();nextGap=sp*(28+Math.random()*29)+obs[obs.length-1].w}
   for(const o of obs){
     if(o.fly)continue;
-    if(o.k==="pickup"){
-      if(!hasBike&&PX+52>o.x+5&&PX+8<o.x+o.w-5&&py>GY-60){
-        hasBike=true;o.dead=1;bikeMsgT=90;bikeMsg="Fahrrad eingesammelt";
-      }
-      continue;
+    if(o.k==="beer"&&PX+52>o.x&&PX+8<o.x+o.w&&py>GY-58){
+      invulnT=300;o.dead=1;bikeMsgT=90;bikeMsg="STERNBURG-Schutz: 5 Sekunden";
+    }else if(o.k==="pickup"&&!hasBike&&PX+52>o.x+5&&PX+8<o.x+o.w-5&&py>GY-60){
+      hasBike=true;o.dead=1;bikeMsgT=90;bikeMsg="Fahrrad eingesammelt";
     }
+  }
+  for(const o of obs){
+    if(o.fly||o.k==="beer"||o.k==="pickup")continue;
+    if(invulnT>0)continue;
     if(o.k==="tram"){
       const overlaps=PX+8<o.x+o.w-4&&PX+52>o.x+4;
       const top=GY-o.h;
@@ -249,8 +254,8 @@ function runner(){
   ctx.lineWidth=5;ctx.beginPath();
   ctx.moveTo(x-2,y-44);ctx.lineTo(x-12-phase*5,y-32);
   ctx.moveTo(x+1,y-44);ctx.lineTo(x+11+phase*5,y-34);ctx.stroke();
-  ctx.fillStyle="#111";ctx.beginPath();ctx.arc(x+5,y-61,8.5,0,7);ctx.fill();
-  ctx.fillStyle="#e0b48c";ctx.beginPath();ctx.arc(x+9,y-60,4.5,0,7);ctx.fill();
+  ctx.fillStyle="#111";ctx.beginPath();ctx.arc(x+1,y-57,8.5,0,7);ctx.fill();
+  ctx.fillStyle="#e0b48c";ctx.beginPath();ctx.arc(x+5,y-56,4.5,0,7);ctx.fill();
   ctx.save();ctx.translate(x-1,y-39);ctx.rotate(-.16);ctx.fillStyle="#fff";ctx.font="bold 8px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("161",0,0);ctx.restore();
   ctx.lineCap="butt";
 }
@@ -263,6 +268,17 @@ function bikePickup(o){
   ctx.beginPath();ctx.moveTo(x+12,y-11);ctx.lineTo(x+23,y-28);ctx.lineTo(x+34,y-11);ctx.lineTo(x+12,y-11);
   ctx.moveTo(x+23,y-28);ctx.lineTo(x+43,y-11);ctx.moveTo(x+34,y-11);ctx.lineTo(x+43,y-11);ctx.stroke();
   ctx.fillStyle="#20202a";ctx.beginPath();ctx.arc(x+24,y-35,4,0,7);ctx.fill();
+}
+function beerPickup(o){
+  const x=o.x,y=GY;
+  ctx.fillStyle="rgba(226,165,52,.24)";ctx.beginPath();ctx.arc(x+14,y-25,25,0,7);ctx.fill();
+  ctx.fillStyle="#382018";ctx.beginPath();ctx.roundRect(x+6,y-38,16,36,5);ctx.fill();
+  ctx.fillStyle="#a94d18";ctx.fillRect(x+8,y-42,12,8);
+  ctx.fillStyle="#39221a";ctx.fillRect(x+9,y-47,10,6);
+  ctx.fillStyle="#d6b98b";ctx.beginPath();ctx.roundRect(x+7,y-25,14,16,2);ctx.fill();
+  ctx.fillStyle="#a21f24";ctx.beginPath();ctx.arc(x+14,y-31,5,0,7);ctx.fill();
+  ctx.fillStyle="#fff";txt("★",x+14,y-29,7,"#fff");
+  txt("STERN",x+14,y-15,4,"#6b1717");
 }
 function flame(fx,fy,h){ctx.beginPath();ctx.moveTo(fx-6,fy);ctx.quadraticCurveTo(fx-6,fy-h*.5,fx,fy-h);ctx.quadraticCurveTo(fx+6,fy-h*.5,fx+6,fy);ctx.fill()}
 function barricade(x){
@@ -358,12 +374,16 @@ function draw(){
   ctx.fillStyle="#6d6575";for(let x=-(dist%60);x<W;x+=60)ctx.fillRect(x,GY+24,30,3);
   for(const s of smoke){ctx.fillStyle="rgba(35,30,42,"+Math.max(0,s.a)+")";ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()}
   for(const o of obs){
-    if(o.k==="pickup")bikePickup(o);else if(o.k==="tram")tram(o);else if(o.k==="bin")bin(o.x);else if(o.k==="bin2"){bin(o.x);bin(o.x+32)}else if(o.k==="bar")barricade(o.x);
+    if(o.k==="beer")beerPickup(o);else if(o.k==="pickup")bikePickup(o);else if(o.k==="tram")tram(o);else if(o.k==="bin")bin(o.x);else if(o.k==="bin2"){bin(o.x);bin(o.x+32)}else if(o.k==="bar")barricade(o.x);
     else if(o.k==="stack"){bin(o.x);bin(o.x,41)}else if(o.k==="bar2"){barricade(o.x);barricade(o.x+52)}else if(o.k==="bird")bird(o);else if(o.k==="car")car(o);
     else if(o.fly){ctx.save();ctx.translate(o.x+13,GY-30+o.fy);ctx.rotate(o.rot);ctx.translate(-(o.x+13),-(GY-30));cop(o.x);ctx.restore()}
     else cop(o.x)}
+  ctx.save();
+  if(invulnT>0&&Math.floor(performance.now()/90)%2===0)ctx.globalAlpha=.5;
   if(hasBike)bike();else runner();
+  ctx.restore();
   if(bikeMsgT>0)txt(bikeMsg,W/2,82,18,bikeMsg==="Fahrrad verloren"?"#ffdb68":"#fff");
+  if(invulnT>0)txt("STERNBURG "+(invulnT/60).toFixed(1)+"s",W/2,82,18,"#ffd36b");
   for(const p of pops){ctx.globalAlpha=Math.max(0,1-p.t/50);txt("+50",p.x,p.y,24,"#ffe066");ctx.globalAlpha=1}
   txt("Punkte "+score(),W-14,30,20,"#fff","right");
   txt("Rekord "+best,W-14,54,16,"#ffe9c7","right");
