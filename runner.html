@@ -99,10 +99,10 @@ document.addEventListener("keydown",e=>{
 });
 function spawn(){
   let r=Math.random(),o;
-  if(r<.018)o={k:"beer",w:28,h:48};
-  else if(!hasBike&&r<.098)o={k:"pickup",w:56,h:50};
+  if(r<.036)o={k:"beer",w:28,h:48};
+  else if(!hasBike&&r<.092)o={k:"pickup",w:56,h:50};
   else{
-    if(!hasBike)r=(r-.098)/.902;
+    if(!hasBike)r=(r-.092)/.908;
     if(r<.1&&dist>1200)o={k:"tram",w:560,h:74,rs:2.5};
     else if(r<.2)o={k:"bin",w:26,h:40};
     else if(r<.32)o={k:"bin2",w:58,h:40};
